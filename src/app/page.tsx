@@ -1,101 +1,384 @@
-import Image from "next/image";
+'use client'
 
-export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+import { useState, useEffect, useRef } from 'react'
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
-  );
+interface ConditionsStatus {
+  face_straight: boolean
+  distance_ok: boolean
+  lighting_ok: boolean
 }
+
+interface Prediction {
+  x: number
+  y: number
+  width: number
+  height: number
+  confidence: number
+  class: string
+  class_id: number
+}
+
+interface AnalysisResult {
+  predictions: {
+    predictions: Prediction[]
+  }
+  analyzed_image: string
+  recognition_result?: {
+    class?: string
+    confidence?: number
+    error?: string
+  }
+}
+
+declare global {
+  interface Window {
+    speechCommands: any;
+  }
+}
+
+const FaceMeshViewer = () => {
+  const [status, setStatus] = useState('Connecting...')
+  const [imageUrl, setImageUrl] = useState('')
+  const [conditions, setConditions] = useState<ConditionsStatus>({
+    face_straight: false,
+    distance_ok: false,
+    lighting_ok: false
+  })
+  const [scanProgress, setScanProgress] = useState(0)
+  const [scanPass, setScanPass] = useState(1)
+  const [conditionsMet, setConditionsMet] = useState(false)
+  const [scanComplete, setScanComplete] = useState(false)
+  const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null)
+  const [analysisPending, setAnalysisPending] = useState(false)
+  const wsRef = useRef<WebSocket | null>(null)
+  const frameRequestRef = useRef<number | undefined>(undefined)
+  const [isListening, setIsListening] = useState(false);
+  const [voicePredictions, setVoicePredictions] = useState<string[]>([]);
+  
+  const URL = "./my_model/";
+
+  useEffect(() => {
+    // Only set up WebSocket if scan is not complete
+    if (!scanComplete) {
+      connectWebSocket()
+    }
+    
+    return () => cleanup()
+  }, [scanComplete])
+
+  const connectWebSocket = () => {
+    const ws = new WebSocket(`ws://127.0.0.1:8000/ws/${Date.now()}`)
+    wsRef.current = ws
+
+    ws.onopen = () => {
+      setStatus('Connected')
+      requestNextFrame()
+    }
+
+    ws.onmessage = (event) => {
+      try {
+        const message = JSON.parse(event.data)
+        
+        switch(message.type) {
+          case 'video_feed':
+            setImageUrl(`data:image/jpeg;base64,${message.data}`)
+            setConditions(message.conditions_status)
+            setConditionsMet(message.conditions_met)
+            setScanProgress(message.scan_progress)
+            setScanPass(message.scan_pass)
+
+            // Check for recognition result
+            if (message.recognition_result) {
+              console.log("Recognition complete!", message.recognition_result)
+              setAnalysisResult({
+                predictions: { predictions: [] },
+                analyzed_image: message.data,
+                recognition_result: message.recognition_result
+              })
+              setScanComplete(true)
+              cleanup()
+            } else if (message.scan_pass > 2 && !analysisPending) {
+              setAnalysisPending(true)
+              console.log("Scan complete, waiting for recognition...")
+            } else {
+              frameRequestRef.current = window.setTimeout(requestNextFrame, 20)
+            }
+            break
+
+          case 'analysis_complete':
+            console.log("Analysis complete!", message)
+            setAnalysisResult({
+              predictions: message.predictions,
+              analyzed_image: message.data
+            })
+            setScanComplete(true)
+            cleanup()
+            break
+
+          case 'analysis_error':
+            console.error("Analysis failed:", message.message)
+            setStatus('Analysis Failed')
+            cleanup()
+            break
+        }
+      } catch (error) {
+        console.error('Error:', error)
+      }
+    }
+
+    ws.onclose = () => {
+      setStatus('Disconnected')
+    }
+
+    ws.onerror = (error) => {
+      console.error('WebSocket error:', error)
+      setStatus('Connection Error')
+    }
+  }
+
+  const cleanup = () => {
+    if (frameRequestRef.current) {
+      clearTimeout(frameRequestRef.current)
+    }
+    if (wsRef.current) {
+      wsRef.current.close()
+    }
+  }
+
+  const requestNextFrame = () => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send('next')
+    }
+  }
+
+  const handleReset = () => {
+    setScanComplete(false)
+    setScanProgress(0)
+    setScanPass(1)
+    setConditionsMet(false)
+    setImageUrl('')
+    setAnalysisResult(null)
+    setAnalysisPending(false)
+  }
+
+  const getStatusText = () => {
+    if (analysisPending) return "Analyzing face..."
+    if (!conditions.face_straight) return "Please face straight ahead"
+    if (!conditions.distance_ok) return "Please adjust your distance"
+    if (!conditions.lighting_ok) return "Please improve lighting"
+    if (conditionsMet) {
+      return `Scanning in progress: ${Math.round(scanProgress)}%`
+    }
+    return "Please maintain position"
+  }
+
+  async function createModel() {
+    const checkpointURL = URL + "model.json";
+    const metadataURL = URL + "metadata.json";
+
+    const recognizer = await window.speechCommands.create(
+      "BROWSER_FFT",
+      undefined,
+      checkpointURL,
+      metadataURL
+    );
+
+    await recognizer.ensureModelLoaded();
+    return recognizer;
+  }
+
+  async function initVoiceRecognition() {
+    try {
+      const recognizer = await createModel();
+      const classLabels = recognizer.wordLabels();
+      
+      setIsListening(true);
+      
+      recognizer.listen(
+        (result: { scores: number[] }) => {
+          const scores = result.scores;
+          const predictions = classLabels.map(
+            (label: string, index: number) => 
+              `${label}: ${scores[index].toFixed(2)}`
+          );
+          setVoicePredictions(predictions);
+        },
+        {
+          includeSpectrogram: true,
+          probabilityThreshold: 0.75,
+          invokeCallbackOnNoiseAndUnknown: true,
+          overlapFactor: 0.50
+        }
+      );
+    } catch (error) {
+      console.error('Error initializing audio recognition:', error);
+    }
+  }
+
+  if (scanComplete && analysisResult) {
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center">
+        <div className="bg-white p-8 rounded-lg text-center max-w-4xl w-full">
+          <h2 className="text-2xl font-bold mb-4 text-green-600">Scan Complete!</h2>
+          
+          {/* Display the analyzed image */}
+          <div className="mb-6 relative">
+            <img 
+              src={`data:image/jpeg;base64,${analysisResult.analyzed_image}`}
+              alt="Analysis Result"
+              className="max-w-full h-auto mx-auto"
+            />
+          </div>
+
+          {/* Display recognition results */}
+          <div className="mb-6">
+            {analysisResult.recognition_result ? (
+              analysisResult.recognition_result.error ? (
+                <div className="p-4 bg-red-100 text-red-700 rounded-lg">
+                  <h3 className="text-xl font-semibold mb-2">Recognition Failed</h3>
+                  <p>{analysisResult.recognition_result.error}</p>
+                  {analysisResult.recognition_result.confidence && (
+                    <p className="text-sm mt-2">
+                      Confidence: {(analysisResult.recognition_result.confidence * 100).toFixed(1)}%
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <div className="p-4 bg-green-100 text-green-700 rounded-lg">
+                  <h3 className="text-xl font-semibold mb-2">Face Recognized</h3>
+                  <p className="text-lg">Are you {analysisResult.recognition_result.class}?</p>
+                  {analysisResult.recognition_result.confidence && (
+                    <p className="text-sm mt-2">
+                      Confidence: {(analysisResult.recognition_result.confidence * 100).toFixed(1)}%
+                    </p>
+                  )}
+                </div>
+              )
+            ) : (
+              <div className="p-4 bg-yellow-100 text-yellow-700 rounded-lg">
+                <p>No recognition results available</p>
+              </div>
+            )}
+          </div>
+
+          {/* Voice Recognition Section */}
+          <div className="mb-6">
+            <button
+              onClick={initVoiceRecognition}
+              disabled={isListening}
+              className={`mb-4 px-4 py-2 rounded ${
+                isListening 
+                  ? 'bg-gray-400 cursor-not-allowed' 
+                  : 'bg-blue-500 hover:bg-blue-600 text-white'
+              }`}
+            >
+              {isListening ? 'Listening...' : 'Start Voice Recognition'}
+            </button>
+
+            <div className="space-y-2">
+              {voicePredictions.map((prediction, index) => (
+                <div key={index} className="p-2 bg-gray-100 rounded">
+                  {prediction}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Buttons */}
+          <div className="flex justify-center space-x-4">
+            {analysisResult.recognition_result && !analysisResult.recognition_result.error && (
+              <>
+                <button 
+                  onClick={() => {/* Handle Yes click */}}
+                  className="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-6 rounded transition-colors"
+                >
+                  Yes
+                </button>
+                <button 
+                  onClick={() => handleReset()}
+                  className="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-6 rounded transition-colors"
+                >
+                  No
+                </button>
+              </>
+            )}
+            {(!analysisResult.recognition_result || analysisResult.recognition_result.error) && (
+              <button 
+                onClick={handleReset}
+                className="bg-blue-500 hover:bg-blue-600 text-white font-bold py-2 px-6 rounded transition-colors"
+              >
+                Scan Again
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="container mx-auto p-4">
+      <h1 className="text-2xl font-bold mb-4">Face Scanner</h1>
+      <div className="mb-4">Connection Status: {status}</div>
+      
+      {/* Conditions Status */}
+      <div className="mb-4 space-y-2">
+        <div className="flex items-center space-x-2">
+          <div className={`w-3 h-3 rounded-full ${conditions.face_straight ? 'bg-green-500' : 'bg-red-500'}`} />
+          <span>Face Position {conditions.face_straight ? '✓' : '×'}</span>
+        </div>
+        <div className="flex items-center space-x-2">
+          <div className={`w-3 h-3 rounded-full ${conditions.distance_ok ? 'bg-green-500' : 'bg-red-500'}`} />
+          <span>Distance {conditions.distance_ok ? '✓' : '×'}</span>
+        </div>
+        <div className="flex items-center space-x-2">
+          <div className={`w-3 h-3 rounded-full ${conditions.lighting_ok ? 'bg-green-500' : 'bg-red-500'}`} />
+          <span>Lighting {conditions.lighting_ok ? '✓' : '×'}</span>
+        </div>
+      </div>
+
+      {/* Status Message */}
+      <div className="mb-4 text-lg font-semibold">
+        {getStatusText()}
+      </div>
+      
+      {/* Progress Bar */}
+      {(conditionsMet || analysisPending) && (
+        <div className="w-full bg-gray-200 rounded-full h-2.5 mb-4 dark:bg-gray-700">
+          <div 
+            className="bg-blue-600 h-2.5 rounded-full transition-all duration-300"
+            style={{ 
+              width: analysisPending ? '100%' : `${scanProgress}%`,
+              transition: analysisPending ? 'width 1s ease-in-out' : 'width 0.3s ease-in-out'
+            }}
+          />
+        </div>
+      )}
+      
+      {/* Scan Pass Indicator */}
+      {scanProgress > 0 && !analysisPending && (
+        <div className="mb-4">
+          Scan Pass: {scanPass}/2
+        </div>
+      )}
+      
+      {/* Video Feed */}
+      <div className="w-[640px] h-[480px] relative">
+        {imageUrl && (
+          <img 
+            src={imageUrl} 
+            alt="Face Scan"
+            className="w-full h-full object-contain bg-black"
+          />
+        )}
+        
+        {/* Overlay Guide */}
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
+          <div className="w-64 h-64 border-2 border-white border-opacity-50 rounded-full"></div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export default FaceMeshViewer
