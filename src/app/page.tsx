@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import generatePDF from 'react-to-pdf'
 
 interface ConditionsStatus {
   face_straight: boolean
@@ -30,19 +31,38 @@ interface AnalysisResult {
   }
 }
 
+interface Student {
+  id: number
+  name: string
+  status: string
+  timestamp: string
+}
+
+interface AttendanceReportProps {
+  selectedClass: string
+  className: string
+  students: Student[]
+  onClose: () => void
+}
+
+interface ClassItem {
+  id: string
+  name: string
+}
+
 declare global {
   interface Window {
-    speechCommands: any;
+    speechCommands: any
   }
 }
 
-const MOCK_CLASSES = [
+const MOCK_CLASSES: ClassItem[] = [
   { id: 'CSC2506', name: 'Software Engineering' },
   { id: 'SKM3144', name: 'Database Systems' },
   { id: 'SKM1102', name: 'Programming Fundamentals' },
 ]
 
-const MOCK_STUDENTS = [
+const DEFAULT_STUDENTS: Student[] = [
   { id: 1, name: 'AYMAN', status: 'Absent', timestamp: '-' },
   { id: 2, name: 'IVEN', status: 'Absent', timestamp: '-' },
   { id: 3, name: 'RAFIE', status: 'Absent', timestamp: '-' },
@@ -65,6 +85,232 @@ const MOCK_STUDENTS = [
   { id: 20, name: 'SHAHRIZAL', status: 'Absent', timestamp: '-' }
 ]
 
+const AttendanceReport: React.FC<AttendanceReportProps> = ({ selectedClass, className, students, onClose }) => {
+  const reportRef = useRef<HTMLDivElement>(null);
+  const presentStudents = students.filter(s => s.status === 'Present');
+  const absentStudents = students.filter(s => s.status === 'Absent');
+
+  const [timeStats, setTimeStats] = useState({
+    early: 0,
+    onTime: 0,
+    late: 0
+  });
+  
+  const calculatePercentage = (value: number) => {
+    return ((value / students.length) * 100).toFixed(1);
+  };
+  
+  const getTotalPresent = () => {
+    return students.filter(student => student.status === 'Present').length;
+  };
+
+  const getTotalAbsent = () => {
+    return students.filter(student => student.status === 'Absent').length;
+  };
+
+  const getAttendanceRate = () => {
+    const present = getTotalPresent();
+    return ((present / students.length) * 100).toFixed(1);
+  };
+
+  const formatDate = () => {
+    const today = new Date();
+    return today.toLocaleDateString('en-US', { 
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  };
+
+  const handleDownload = () => {
+    generatePDF(reportRef, {
+      filename: `attendance-report-${selectedClass}-${formatDate()}.pdf`,
+      page: { 
+        margin: 20,
+        format: 'A4'
+      }
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50 overflow-hidden">
+  <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full mx-auto p-8 max-h-[90vh] overflow-y-auto">
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-2xl font-bold">Attendance Report</h2>
+          <div className="space-x-4">
+            <button
+              onClick={handleDownload}
+              className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded"
+            >
+              Download PDF
+            </button>
+            <button
+              onClick={onClose}
+              className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+
+        <div ref={reportRef} className="bg-white p-8">
+          <div className="text-center mb-8">
+            <h1 className="text-3xl font-bold mb-2">Class Attendance Report</h1>
+            <p className="text-gray-600">{formatDate()}</p>
+          </div>
+
+          <div className="mb-8">
+            <h2 className="text-xl font-semibold mb-4">Class Information</h2>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p><strong>Course Code:</strong> {selectedClass}</p>
+                <p><strong>Course Name:</strong> {className}</p>
+              </div>
+              <div>
+                <p><strong>Total Students:</strong> {students.length}</p>
+                <p><strong>Attendance Rate:</strong> {getAttendanceRate()}%</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="mb-8">
+            <h2 className="text-xl font-semibold mb-4">Attendance Summary</h2>
+            <div className="grid grid-cols-3 gap-4">
+              <div className="bg-green-100 p-4 rounded">
+                <p className="text-lg font-semibold">{getTotalPresent()}</p>
+                <p className="text-sm text-gray-600">Present</p>
+              </div>
+              <div className="bg-red-100 p-4 rounded">
+                <p className="text-lg font-semibold">{getTotalAbsent()}</p>
+                <p className="text-sm text-gray-600">Absent</p>
+              </div>
+              <div className="bg-blue-100 p-4 rounded">
+                <p className="text-lg font-semibold">{getAttendanceRate()}%</p>
+                <p className="text-sm text-gray-600">Attendance Rate</p>
+              </div>
+            </div>
+          </div>
+
+          <div>
+  <h2 className="text-xl font-semibold mb-4">Attendance Analytics</h2>
+  
+  {/* Attendance Breakdown */}
+  <div className="mb-8">
+    <h3 className="text-lg font-medium mb-3">Attendance Breakdown</h3>
+    <div className="bg-white p-4 rounded-lg shadow">
+      <div className="flex justify-between items-center mb-2">
+        <span className="text-sm font-medium">Present</span>
+        <span className="text-sm text-gray-600">{calculatePercentage(presentStudents.length)}%</span>
+      </div>
+      <div className="w-full bg-gray-200 rounded-full h-2">
+        <div 
+          className="bg-green-500 h-2 rounded-full" 
+          style={{ width: `${calculatePercentage(presentStudents.length)}%` }}
+        />
+      </div>
+      
+      <div className="flex justify-between items-center mb-2 mt-4">
+        <span className="text-sm font-medium">Absent</span>
+        <span className="text-sm text-gray-600">{calculatePercentage(absentStudents.length)}%</span>
+      </div>
+      <div className="w-full bg-gray-200 rounded-full h-2">
+        <div 
+          className="bg-red-500 h-2 rounded-full" 
+          style={{ width: `${calculatePercentage(absentStudents.length)}%` }}
+        />
+      </div>
+    </div>
+  </div>
+
+  {/* Present Students List */}
+  <div className="mb-8">
+    <h3 className="text-lg font-medium mb-3">Present Students ({presentStudents.length})</h3>
+    <div className="bg-white rounded-lg shadow overflow-hidden">
+      {presentStudents.length > 0 ? (
+        <div className="divide-y divide-gray-200">
+          {presentStudents.map(student => (
+            <div key={student.id} className="p-4 flex justify-between items-center">
+              <div>
+                <p className="font-medium">{student.name}</p>
+                <p className="text-sm text-gray-500">ID: {student.id}</p>
+              </div>
+              <div className="text-right">
+                <p className="text-sm font-medium text-green-600">Present</p>
+                <p className="text-sm text-gray-500">{student.timestamp}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="p-4 text-gray-500 text-center">No students present yet</p>
+      )}
+    </div>
+  </div>
+
+  {/* Absent Students List */}
+  <div className="mb-8">
+    <h3 className="text-lg font-medium mb-3">Absent Students ({absentStudents.length})</h3>
+    <div className="bg-white rounded-lg shadow overflow-hidden">
+      {absentStudents.length > 0 ? (
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4 p-4">
+          {absentStudents.map(student => (
+            <div key={student.id} className="text-sm">
+              <span className="font-medium">{student.name}</span>
+              <span className="text-gray-500 ml-2">(ID: {student.id})</span>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <p className="p-4 text-gray-500 text-center">No absent students</p>
+      )}
+    </div>
+  </div>
+
+  {/* Insights Section */}
+  <div className="mb-8">
+    <h3 className="text-lg font-medium mb-3">Attendance Insights</h3>
+    <div className="bg-white p-4 rounded-lg shadow">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <h4 className="text-sm font-medium mb-2">Class Status</h4>
+          <ul className="space-y-2 text-sm">
+            <li>• Total Enrolled: {students.length} students</li>
+            <li>• Attendance Rate: {getAttendanceRate()}%</li>
+            <li>• Present Today: {presentStudents.length} students</li>
+            <li>• Absent Today: {absentStudents.length} students</li>
+          </ul>
+        </div>
+        <div>
+          <h4 className="text-sm font-medium mb-2">Recommendations</h4>
+          <ul className="space-y-2 text-sm">
+            {absentStudents.length > (students.length / 2) && (
+              <li>• High absence rate - Consider following up with students</li>
+            )}
+            {absentStudents.length === 0 && (
+              <li>• Perfect attendance today!</li>
+            )}
+            {presentStudents.length > 0 && (
+              <li>• Regular attendance tracking is being maintained</li>
+            )}
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+          <div className="mt-8 pt-8 border-t">
+            <p className="text-sm text-gray-600 text-center">
+              Generated on {formatDate()}
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const FaceMeshViewer = () => {
   const [status, setStatus] = useState('Connecting...')
   const [imageUrl, setImageUrl] = useState('')
@@ -79,12 +325,10 @@ const FaceMeshViewer = () => {
   const [scanComplete, setScanComplete] = useState(false)
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null)
   const [analysisPending, setAnalysisPending] = useState(false)
-  const wsRef = useRef<WebSocket | null>(null)
-  const frameRequestRef = useRef<number | undefined>(undefined)
-  const [isListening, setIsListening] = useState(false);
-  const [voicePredictions, setVoicePredictions] = useState<string[]>([]);
-  
-  // New states for authentication and class selection
+  const [isListening, setIsListening] = useState(false)
+  const [voicePredictions, setVoicePredictions] = useState<string[]>([])
+  const [students, setStudents] = useState<Student[]>(DEFAULT_STUDENTS)
+  const [showReport, setShowReport] = useState(false)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [selectedClass, setSelectedClass] = useState<string | null>(null)
   const [showFaceRecognition, setShowFaceRecognition] = useState(false)
@@ -93,14 +337,15 @@ const FaceMeshViewer = () => {
     password: ''
   })
 
-  const URL = "./my_model/";
+  const wsRef = useRef<WebSocket | null>(null)
+  const frameRequestRef = useRef<number | undefined>(undefined)
+
+  const URL = "./my_model/"
 
   useEffect(() => {
-    // Only set up WebSocket if scan is not complete
     if (!scanComplete) {
       connectWebSocket()
     }
-    
     return () => cleanup()
   }, [scanComplete])
 
@@ -125,7 +370,6 @@ const FaceMeshViewer = () => {
             setScanProgress(message.scan_progress)
             setScanPass(message.scan_pass)
 
-            // Check for recognition result
             if (message.recognition_result) {
               console.log("Recognition complete!", message.recognition_result)
               setAnalysisResult({
@@ -211,26 +455,26 @@ const FaceMeshViewer = () => {
   }
 
   async function createModel() {
-    const checkpointURL = URL + "model.json";
-    const metadataURL = URL + "metadata.json";
+    const checkpointURL = URL + "model.json"
+    const metadataURL = URL + "metadata.json"
 
     const recognizer = await window.speechCommands.create(
       "BROWSER_FFT",
       undefined,
       checkpointURL,
       metadataURL
-    );
+    )
 
-    await recognizer.ensureModelLoaded();
-    return recognizer;
+    await recognizer.ensureModelLoaded()
+    return recognizer
   }
 
   async function initVoiceRecognition() {
     try {
-      const recognizer = await createModel();
-      const classLabels = recognizer.wordLabels();
+      const recognizer = await createModel()
+      const classLabels = recognizer.wordLabels()
       
-      setIsListening(true);
+      setIsListening(true)
       
       recognizer.listen(
         (result: { scores: number[] }) => {
@@ -255,7 +499,6 @@ const FaceMeshViewer = () => {
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault()
-    // Mock authentication - replace with actual authentication
     if (loginData.username && loginData.password) {
       setIsAuthenticated(true)
     }
@@ -332,14 +575,20 @@ const FaceMeshViewer = () => {
           </div>
           <div className="space-x-4">
             <button
+              onClick={() => setShowReport(true)}
+              className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded transition-colors"
+            >
+              Generate Report
+            </button>
+            <button
               onClick={() => setSelectedClass(null)}
-              className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600"
+              className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded transition-colors"
             >
               Change Class
             </button>
             <button
               onClick={() => setShowFaceRecognition(true)}
-              className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600"
+              className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded transition-colors"
             >
               Register Attendance
             </button>
@@ -356,24 +605,42 @@ const FaceMeshViewer = () => {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Time</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-200">
-              {MOCK_STUDENTS.map((student) => (
+            <tbody className="bg-white divide-y divide-gray-200">
+              {students.map((student) => (
                 <tr key={student.id}>
-                  <td className="px-6 py-4">{student.id}</td>
-                  <td className="px-6 py-4">{student.name}</td>
-                  <td className="px-6 py-4">
-                    <span className={`px-2 py-1 rounded-full text-sm ${
-                      student.status === 'Present' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {student.id}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {student.name}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${
+                      student.status === 'Present'
+                        ? 'bg-green-100 text-green-800'
+                        : 'bg-red-100 text-red-800'
                     }`}>
                       {student.status}
                     </span>
                   </td>
-                  <td className="px-6 py-4">{student.timestamp}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {student.timestamp}
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
+
+        {/* Add AttendanceReport component here */}
+        {showReport && (
+          <AttendanceReport
+            selectedClass={selectedClass}
+            className={MOCK_CLASSES.find(c => c.id === selectedClass)?.name || ''}
+            students={students}
+            onClose={() => setShowReport(false)}
+          />
+        )}
       </div>
     )
   }
@@ -384,7 +651,6 @@ const FaceMeshViewer = () => {
         <div className="bg-white p-8 rounded-lg text-center max-w-4xl w-full">
           <h2 className="text-2xl font-bold mb-4 text-green-600">Scan Complete!</h2>
           
-          {/* Display the analyzed image */}
           <div className="mb-6 relative">
             <img 
               src={`data:image/jpeg;base64,${analysisResult.analyzed_image}`}
@@ -393,7 +659,6 @@ const FaceMeshViewer = () => {
             />
           </div>
 
-          {/* Display recognition results */}
           <div className="mb-6">
             {analysisResult.recognition_result ? (
               analysisResult.recognition_result.error ? (
@@ -424,7 +689,6 @@ const FaceMeshViewer = () => {
             )}
           </div>
 
-          {/* Voice Recognition Section */}
           <div className="mb-6">
             <button
               onClick={initVoiceRecognition}
@@ -447,18 +711,36 @@ const FaceMeshViewer = () => {
             </div>
           </div>
 
-          {/* Buttons */}
           <div className="flex justify-center space-x-4">
             {analysisResult.recognition_result && !analysisResult.recognition_result.error && (
               <>
                 <button 
-                  onClick={() => {/* Handle Yes click */}}
-                  className="bg-green-500 hover:bg-green-600 text-white font-bold py-2 px-6 rounded transition-colors"
+                  onClick={() => {
+                    if (analysisResult.recognition_result?.class) {
+                      const now = new Date();
+                      const timeString = now.toLocaleTimeString();
+                      
+                      const updatedStudents = students.map(student => {
+                        if (student.name === analysisResult.recognition_result?.class) {
+                          return {
+                            ...student,
+                            status: 'Present',
+                            timestamp: timeString
+                          };
+                        }
+                        return student;
+                      });
+                      
+                      setStudents(updatedStudents);
+                      setShowFaceRecognition(false);
+                    }
+                  }}
+                  className="flex-1 bg-green-500 hover:bg-green-600 text-white font-medium py-2 px-4 rounded-lg transition-colors"
                 >
                   Yes
                 </button>
                 <button 
-                  onClick={() => handleReset()}
+                  onClick={handleReset}
                   className="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-6 rounded transition-colors"
                 >
                   No
@@ -481,9 +763,7 @@ const FaceMeshViewer = () => {
 
   return (
     <div className="fixed inset-0 overflow-hidden">
-      {/* Video Feed Container with Overlay */}
       <div className="relative w-full h-full">
-        {/* Full-size Video Feed */}
         {imageUrl && (
           <img 
             src={imageUrl} 
@@ -492,11 +772,9 @@ const FaceMeshViewer = () => {
           />
         )}
         
-        {/* Status Overlay - positioned at the bottom left */}
         <div className="absolute bottom-4 left-4 bg-black bg-opacity-50 p-4 rounded-lg text-white">
           <div className="text-sm mb-2">Connection Status: {status}</div>
           
-          {/* Conditions Status */}
           <div className="space-y-1">
             <div className="flex items-center space-x-2">
               <div className={`w-2 h-2 rounded-full ${conditions.face_straight ? 'bg-green-500' : 'bg-red-500'}`} />
@@ -512,12 +790,10 @@ const FaceMeshViewer = () => {
             </div>
           </div>
 
-          {/* Status Message */}
           <div className="mt-2 text-sm font-semibold">
             {getStatusText()}
           </div>
           
-          {/* Progress Bar */}
           {(conditionsMet || analysisPending) && (
             <div className="w-full bg-gray-200 rounded-full h-2 mt-2 dark:bg-gray-700">
               <div 
@@ -530,7 +806,6 @@ const FaceMeshViewer = () => {
             </div>
           )}
           
-          {/* Scan Pass Indicator */}
           {scanProgress > 0 && !analysisPending && (
             <div className="mt-2 text-sm">
               Scan Pass: {scanPass}/2
@@ -538,7 +813,6 @@ const FaceMeshViewer = () => {
           )}
         </div>
         
-        {/* Face Guide Overlay */}
         <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
           <div className="w-64 h-64 border-2 border-white border-opacity-50 rounded-full"></div>
         </div>
