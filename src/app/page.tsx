@@ -689,27 +689,8 @@ const FaceMeshViewer = () => {
             )}
           </div>
 
-          <div className="mb-6">
-            <button
-              onClick={initVoiceRecognition}
-              disabled={isListening}
-              className={`mb-4 px-4 py-2 rounded ${
-                isListening 
-                  ? 'bg-gray-400 cursor-not-allowed' 
-                  : 'bg-blue-500 hover:bg-blue-600 text-white'
-              }`}
-            >
-              {isListening ? 'Listening...' : 'Start Voice Recognition'}
-            </button>
+          
 
-            <div className="space-y-2">
-              {voicePredictions.map((prediction, index) => (
-                <div key={index} className="p-2 bg-gray-100 rounded">
-                  {prediction}
-                </div>
-              ))}
-            </div>
-          </div>
 
           <div className="flex justify-center space-x-4">
             {analysisResult.recognition_result && !analysisResult.recognition_result.error && (
