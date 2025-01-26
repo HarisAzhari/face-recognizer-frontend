@@ -36,6 +36,35 @@ declare global {
   }
 }
 
+const MOCK_CLASSES = [
+  { id: 'CSC2506', name: 'Software Engineering' },
+  { id: 'SKM3144', name: 'Database Systems' },
+  { id: 'SKM1102', name: 'Programming Fundamentals' },
+]
+
+const MOCK_STUDENTS = [
+  { id: 1, name: 'AYMAN', status: 'Absent', timestamp: '-' },
+  { id: 2, name: 'IVEN', status: 'Absent', timestamp: '-' },
+  { id: 3, name: 'RAFIE', status: 'Absent', timestamp: '-' },
+  { id: 4, name: 'ALIMIN', status: 'Absent', timestamp: '-' },
+  { id: 5, name: 'ILHAM', status: 'Absent', timestamp: '-' },
+  { id: 6, name: 'IZZAT', status: 'Absent', timestamp: '-' },
+  { id: 7, name: 'MYCLE', status: 'Absent', timestamp: '-' },
+  { id: 8, name: 'HAZIQ', status: 'Absent', timestamp: '-' },
+  { id: 9, name: 'IDRISH', status: 'Absent', timestamp: '-' },
+  { id: 10, name: 'KHAIRUL', status: 'Absent', timestamp: '-' },
+  { id: 11, name: 'HAKIM', status: 'Absent', timestamp: '-' },
+  { id: 12, name: 'NAJIHAH', status: 'Absent', timestamp: '-' },
+  { id: 13, name: 'FAHMI', status: 'Absent', timestamp: '-' },
+  { id: 14, name: 'HARIS', status: 'Absent', timestamp: '-' },
+  { id: 15, name: 'KHAIRIN', status: 'Absent', timestamp: '-' },
+  { id: 16, name: 'FARHAN', status: 'Absent', timestamp: '-' },
+  { id: 17, name: 'MUTTAQIN', status: 'Absent', timestamp: '-' },
+  { id: 18, name: 'HAIMAN', status: 'Absent', timestamp: '-' },
+  { id: 19, name: 'ZAKWAN', status: 'Absent', timestamp: '-' },
+  { id: 20, name: 'SHAHRIZAL', status: 'Absent', timestamp: '-' }
+]
+
 const FaceMeshViewer = () => {
   const [status, setStatus] = useState('Connecting...')
   const [imageUrl, setImageUrl] = useState('')
@@ -55,6 +84,15 @@ const FaceMeshViewer = () => {
   const [isListening, setIsListening] = useState(false);
   const [voicePredictions, setVoicePredictions] = useState<string[]>([]);
   
+  // New states for authentication and class selection
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [selectedClass, setSelectedClass] = useState<string | null>(null)
+  const [showFaceRecognition, setShowFaceRecognition] = useState(false)
+  const [loginData, setLoginData] = useState({
+    username: '',
+    password: ''
+  })
+
   const URL = "./my_model/";
 
   useEffect(() => {
@@ -215,6 +253,131 @@ const FaceMeshViewer = () => {
     }
   }
 
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault()
+    // Mock authentication - replace with actual authentication
+    if (loginData.username && loginData.password) {
+      setIsAuthenticated(true)
+    }
+  }
+
+  // If not authenticated, show login form
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-100">
+        <div className="bg-white p-8 rounded-lg shadow-md w-96">
+          <h2 className="text-2xl font-bold mb-6 text-center">Login</h2>
+          <form onSubmit={handleLogin}>
+            <div className="mb-4">
+              <label className="block text-gray-700 mb-2">Username</label>
+              <input
+                type="text"
+                className="w-full p-2 border rounded"
+                value={loginData.username}
+                onChange={(e) => setLoginData(prev => ({...prev, username: e.target.value}))}
+              />
+            </div>
+            <div className="mb-6">
+              <label className="block text-gray-700 mb-2">Password</label>
+              <input
+                type="password"
+                className="w-full p-2 border rounded"
+                value={loginData.password}
+                onChange={(e) => setLoginData(prev => ({...prev, password: e.target.value}))}
+              />
+            </div>
+            <button
+              type="submit"
+              className="w-full bg-blue-500 text-white py-2 rounded hover:bg-blue-600"
+            >
+              Login
+            </button>
+          </form>
+        </div>
+      </div>
+    )
+  }
+
+  // If authenticated but no class selected, show class selection
+  if (!selectedClass) {
+    return (
+      <div className="min-h-screen p-8 bg-gray-100">
+        <h2 className="text-2xl font-bold mb-6">Select Class</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {MOCK_CLASSES.map((classItem) => (
+            <div
+              key={classItem.id}
+              className="bg-white p-6 rounded-lg shadow-md cursor-pointer hover:shadow-lg transition-shadow"
+              onClick={() => setSelectedClass(classItem.id)}
+            >
+              <h3 className="text-xl font-semibold mb-2">{classItem.id}</h3>
+              <p className="text-gray-600">{classItem.name}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  // If class selected but face recognition not started, show attendance list
+  if (!showFaceRecognition) {
+    return (
+      <div className="min-h-screen p-8 bg-gray-100">
+        <div className="mb-6 flex justify-between items-center">
+          <div>
+            <h2 className="text-2xl font-bold">Class: {selectedClass}</h2>
+            <p className="text-gray-600">
+              {MOCK_CLASSES.find(c => c.id === selectedClass)?.name}
+            </p>
+          </div>
+          <div className="space-x-4">
+            <button
+              onClick={() => setSelectedClass(null)}
+              className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600"
+            >
+              Change Class
+            </button>
+            <button
+              onClick={() => setShowFaceRecognition(true)}
+              className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600"
+            >
+              Register Attendance
+            </button>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg shadow-md overflow-hidden">
+          <table className="w-full">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">ID</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Time</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200">
+              {MOCK_STUDENTS.map((student) => (
+                <tr key={student.id}>
+                  <td className="px-6 py-4">{student.id}</td>
+                  <td className="px-6 py-4">{student.name}</td>
+                  <td className="px-6 py-4">
+                    <span className={`px-2 py-1 rounded-full text-sm ${
+                      student.status === 'Present' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                    }`}>
+                      {student.status}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4">{student.timestamp}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    )
+  }
+
   if (scanComplete && analysisResult) {
     return (
       <div className="fixed inset-0 bg-black bg-opacity-90 flex items-center justify-center">
@@ -317,62 +480,65 @@ const FaceMeshViewer = () => {
   }
 
   return (
-    <div className="container mx-auto p-4">
-      <h1 className="text-2xl font-bold mb-4">Face Scanner</h1>
-      <div className="mb-4">Connection Status: {status}</div>
-      
-      {/* Conditions Status */}
-      <div className="mb-4 space-y-2">
-        <div className="flex items-center space-x-2">
-          <div className={`w-3 h-3 rounded-full ${conditions.face_straight ? 'bg-green-500' : 'bg-red-500'}`} />
-          <span>Face Position {conditions.face_straight ? '✓' : '×'}</span>
-        </div>
-        <div className="flex items-center space-x-2">
-          <div className={`w-3 h-3 rounded-full ${conditions.distance_ok ? 'bg-green-500' : 'bg-red-500'}`} />
-          <span>Distance {conditions.distance_ok ? '✓' : '×'}</span>
-        </div>
-        <div className="flex items-center space-x-2">
-          <div className={`w-3 h-3 rounded-full ${conditions.lighting_ok ? 'bg-green-500' : 'bg-red-500'}`} />
-          <span>Lighting {conditions.lighting_ok ? '✓' : '×'}</span>
-        </div>
-      </div>
-
-      {/* Status Message */}
-      <div className="mb-4 text-lg font-semibold">
-        {getStatusText()}
-      </div>
-      
-      {/* Progress Bar */}
-      {(conditionsMet || analysisPending) && (
-        <div className="w-full bg-gray-200 rounded-full h-2.5 mb-4 dark:bg-gray-700">
-          <div 
-            className="bg-blue-600 h-2.5 rounded-full transition-all duration-300"
-            style={{ 
-              width: analysisPending ? '100%' : `${scanProgress}%`,
-              transition: analysisPending ? 'width 1s ease-in-out' : 'width 0.3s ease-in-out'
-            }}
-          />
-        </div>
-      )}
-      
-      {/* Scan Pass Indicator */}
-      {scanProgress > 0 && !analysisPending && (
-        <div className="mb-4">
-          Scan Pass: {scanPass}/2
-        </div>
-      )}
-      
-      {/* Video Feed */}
-      <div className="w-[640px] h-[480px] relative">
+    <div className="fixed inset-0 overflow-hidden">
+      {/* Video Feed Container with Overlay */}
+      <div className="relative w-full h-full">
+        {/* Full-size Video Feed */}
         {imageUrl && (
           <img 
             src={imageUrl} 
             alt="Face Scan"
-            className="w-full h-full object-contain bg-black"
+            className="w-full h-full object-cover bg-black"
           />
         )}
         
-        {/* Overlay Guide */}
+        {/* Status Overlay - positioned at the bottom left */}
+        <div className="absolute bottom-4 left-4 bg-black bg-opacity-50 p-4 rounded-lg text-white">
+          <div className="text-sm mb-2">Connection Status: {status}</div>
+          
+          {/* Conditions Status */}
+          <div className="space-y-1">
+            <div className="flex items-center space-x-2">
+              <div className={`w-2 h-2 rounded-full ${conditions.face_straight ? 'bg-green-500' : 'bg-red-500'}`} />
+              <span className="text-sm">Face Position {conditions.face_straight ? '✓' : '×'}</span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <div className={`w-2 h-2 rounded-full ${conditions.distance_ok ? 'bg-green-500' : 'bg-red-500'}`} />
+              <span className="text-sm">Distance {conditions.distance_ok ? '✓' : '×'}</span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <div className={`w-2 h-2 rounded-full ${conditions.lighting_ok ? 'bg-green-500' : 'bg-red-500'}`} />
+              <span className="text-sm">Lighting {conditions.lighting_ok ? '✓' : '×'}</span>
+            </div>
+          </div>
+
+          {/* Status Message */}
+          <div className="mt-2 text-sm font-semibold">
+            {getStatusText()}
+          </div>
+          
+          {/* Progress Bar */}
+          {(conditionsMet || analysisPending) && (
+            <div className="w-full bg-gray-200 rounded-full h-2 mt-2 dark:bg-gray-700">
+              <div 
+                className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                style={{ 
+                  width: analysisPending ? '100%' : `${scanProgress}%`,
+                  transition: analysisPending ? 'width 1s ease-in-out' : 'width 0.3s ease-in-out'
+                }}
+              />
+            </div>
+          )}
+          
+          {/* Scan Pass Indicator */}
+          {scanProgress > 0 && !analysisPending && (
+            <div className="mt-2 text-sm">
+              Scan Pass: {scanPass}/2
+            </div>
+          )}
+        </div>
+        
+        {/* Face Guide Overlay */}
         <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
           <div className="w-64 h-64 border-2 border-white border-opacity-50 rounded-full"></div>
         </div>
