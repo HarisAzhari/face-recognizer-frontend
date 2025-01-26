@@ -34,8 +34,7 @@ interface AnalysisResult {
 interface Student {
   id: number
   name: string
-  status: string
-  timestamp: string
+  status: { [classId: string]: { status: string, timestamp: string } }
 }
 
 interface AttendanceReportProps {
@@ -63,32 +62,32 @@ const MOCK_CLASSES: ClassItem[] = [
 ]
 
 const DEFAULT_STUDENTS: Student[] = [
-  { id: 1, name: 'AYMAN', status: 'Absent', timestamp: '-' },
-  { id: 2, name: 'IVEN', status: 'Absent', timestamp: '-' },
-  { id: 3, name: 'RAFIE', status: 'Absent', timestamp: '-' },
-  { id: 4, name: 'ALIMIN', status: 'Absent', timestamp: '-' },
-  { id: 5, name: 'ILHAM', status: 'Absent', timestamp: '-' },
-  { id: 6, name: 'IZZAT', status: 'Absent', timestamp: '-' },
-  { id: 7, name: 'MYCLE', status: 'Absent', timestamp: '-' },
-  { id: 8, name: 'HAZIQ', status: 'Absent', timestamp: '-' },
-  { id: 9, name: 'IDRISH', status: 'Absent', timestamp: '-' },
-  { id: 10, name: 'KHAIRUL', status: 'Absent', timestamp: '-' },
-  { id: 11, name: 'HAKIM', status: 'Absent', timestamp: '-' },
-  { id: 12, name: 'NAJIHAH', status: 'Absent', timestamp: '-' },
-  { id: 13, name: 'FAHMI', status: 'Absent', timestamp: '-' },
-  { id: 14, name: 'HARIS', status: 'Absent', timestamp: '-' },
-  { id: 15, name: 'KHAIRIN', status: 'Absent', timestamp: '-' },
-  { id: 16, name: 'FARHAN', status: 'Absent', timestamp: '-' },
-  { id: 17, name: 'MUTTAQIN', status: 'Absent', timestamp: '-' },
-  { id: 18, name: 'HAIMAN', status: 'Absent', timestamp: '-' },
-  { id: 19, name: 'ZAKWAN', status: 'Absent', timestamp: '-' },
-  { id: 20, name: 'SHAHRIZAL', status: 'Absent', timestamp: '-' }
+  { id: 1, name: 'AYMAN', status: {} },
+  { id: 2, name: 'IVEN', status: {} },
+  { id: 3, name: 'RAFIE', status: {} },
+  { id: 4, name: 'ALIMIN', status: {} },
+  { id: 5, name: 'ILHAM', status: {} },
+  { id: 6, name: 'IZZAT', status: {} },
+  { id: 7, name: 'MYCLE', status: {} },
+  { id: 8, name: 'HAZIQ', status: {} },
+  { id: 9, name: 'IDRISH', status: {} },
+  { id: 10, name: 'KHAIRUL', status: {} },
+  { id: 11, name: 'HAKIM', status: {} },
+  { id: 12, name: 'NAJIHAH', status: {} },
+  { id: 13, name: 'FAHMI', status: {} },
+  { id: 14, name: 'HARIS', status: {} },
+  { id: 15, name: 'KHAIRIN', status: {} },
+  { id: 16, name: 'FARHAN', status: {} },
+  { id: 17, name: 'MUTTAQIN', status: {} },
+  { id: 18, name: 'HAIMAN', status: {} },
+  { id: 19, name: 'ZAKWAN', status: {} },
+  { id: 20, name: 'SHAHRIZAL', status: {} }
 ]
 
 const AttendanceReport: React.FC<AttendanceReportProps> = ({ selectedClass, className, students, onClose }) => {
   const reportRef = useRef<HTMLDivElement>(null);
-  const presentStudents = students.filter(s => s.status === 'Present');
-  const absentStudents = students.filter(s => s.status === 'Absent');
+  const presentStudents = students.filter(s => s.status[selectedClass]?.status === 'Present');
+  const absentStudents = students.filter(s => !s.status[selectedClass]?.status || s.status[selectedClass]?.status === 'Absent');
 
   const [timeStats, setTimeStats] = useState({
     early: 0,
@@ -101,11 +100,11 @@ const AttendanceReport: React.FC<AttendanceReportProps> = ({ selectedClass, clas
   };
   
   const getTotalPresent = () => {
-    return students.filter(student => student.status === 'Present').length;
+    return students.filter(student => student.status[selectedClass]?.status === 'Present').length;
   };
 
   const getTotalAbsent = () => {
-    return students.filter(student => student.status === 'Absent').length;
+    return students.filter(student => !student.status[selectedClass]?.status || student.status[selectedClass]?.status === 'Absent').length;
   };
 
   const getAttendanceRate = () => {
@@ -237,7 +236,7 @@ const AttendanceReport: React.FC<AttendanceReportProps> = ({ selectedClass, clas
               </div>
               <div className="text-right">
                 <p className="text-sm font-medium text-green-600">Present</p>
-                <p className="text-sm text-gray-500">{student.timestamp}</p>
+                <p className="text-sm text-gray-500">{student.status[selectedClass]?.timestamp || '-'}</p>
               </div>
             </div>
           ))}
@@ -587,7 +586,10 @@ const FaceMeshViewer = () => {
               Change Class
             </button>
             <button
-              onClick={() => setShowFaceRecognition(true)}
+              onClick={() => {
+                setShowFaceRecognition(true);
+                handleReset(); // Reset scan state when starting face recognition
+              }}
               className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded transition-colors"
             >
               Register Attendance
@@ -616,15 +618,15 @@ const FaceMeshViewer = () => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                      student.status === 'Present'
+                      student.status[selectedClass]?.status === 'Present'
                         ? 'bg-green-100 text-green-800'
                         : 'bg-red-100 text-red-800'
                     }`}>
-                      {student.status}
+                      {student.status[selectedClass]?.status || 'Absent'}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {student.timestamp}
+                    {student.status[selectedClass]?.timestamp || '-'}
                   </td>
                 </tr>
               ))}
@@ -697,24 +699,26 @@ const FaceMeshViewer = () => {
               <>
                 <button 
                   onClick={() => {
-                    if (analysisResult.recognition_result?.class) {
-                      const now = new Date();
-                      const timeString = now.toLocaleTimeString();
-                      
-                      const updatedStudents = students.map(student => {
-                        if (student.name === analysisResult.recognition_result?.class) {
-                          return {
-                            ...student,
-                            status: 'Present',
-                            timestamp: timeString
-                          };
-                        }
-                        return student;
-                      });
-                      
-                      setStudents(updatedStudents);
-                      setShowFaceRecognition(false);
-                    }
+                    const studentName = analysisResult.recognition_result?.class || '';
+                    const updatedStudents = students.map(student => {
+                      if (student.name.toUpperCase() === studentName.toUpperCase()) {
+                        return {
+                          ...student,
+                          status: {
+                            ...student.status,
+                            [selectedClass]: {
+                              status: 'Present',
+                              timestamp: new Date().toLocaleTimeString()
+                            }
+                          }
+                        };
+                      }
+                      return student;
+                    });
+                    
+                    setStudents(updatedStudents);
+                    setShowFaceRecognition(false);
+                    handleReset();
                   }}
                   className="flex-1 bg-green-500 hover:bg-green-600 text-white font-medium py-2 px-4 rounded-lg transition-colors"
                 >
